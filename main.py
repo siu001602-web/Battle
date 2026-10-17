@@ -81,7 +81,7 @@ difficulty = st.radio("🤖 AI 난이도 선택", ["보통", "매운맛"], horiz
 
 st.divider()
 
-# 상단 체력 및 턴 표시 (안전하게 .get() 또는 세션 상태 체크 후 출력)
+# 안전하게 세션 상태 불러오기 (.get 활용)
 p_wait = st.session_state.get("player_wait_turns", 0)
 ai_wait = st.session_state.get("ai_wait_turns", 0)
 p_hp = st.session_state.get("player_hp", 5)
@@ -134,6 +134,10 @@ else:
 
     # 플레이어가 행동을 골랐을 때 로직 처리
     if player_choice:
+        # 안전하게 player_history가 없다면 생성 후 추가
+        if "player_history" not in st.session_state:
+            st.session_state.player_history = []
+            
         st.session_state.player_history.append(player_choice)
         if len(st.session_state.player_history) > 5:
             st.session_state.player_history.pop(0)
