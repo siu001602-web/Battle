@@ -24,7 +24,6 @@ if "initialized" not in st.session_state:
     st.session_state.winner = None
     st.session_state.log = "궁극기 능력을 선택하고 게임을 시작하세요!"
     st.session_state.player_history = []
-    # 게임 시작 전 선택할 임시 기본값
     st.session_state.player_ult_type = "전투사 (공격력 3 / 실패시 피-1)"
     st.session_state.ai_ult_type = random.choice(["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"])
     st.session_state.initialized = True
@@ -100,35 +99,37 @@ def get_ai_choice(difficulty, player_history, ai_ultimate, ai_counter_cooldown):
 st.title("🔥 하드코어 심리전 턴제 게임")
 st.write("공격, 방어, 치료, 존버, 반격, 그리고 궁극기를 활용해 상대를 쓰러트리세요!")
 
-# 1턴일 때만 능력을 변경할 수 있고, 게임이 진행되면 변경 불가하도록 설정
-is_game_started = st.session_state.turn > 1
+# 안전하게 상태 가져오기
+turn = st.session_state.get("turn", 1)
+is_game_started = turn > 1
 
 col_opt1, col_opt2 = st.columns(2)
 with col_opt1:
     difficulty = st.radio("🤖 AI 난이도", ["보통", "매운맛"], horizontal=True, disabled=is_game_started)
 with col_opt2:
+    current_ult = st.session_state.get("player_ult_type", "전투사 (공격력 3 / 실패시 피-1)")
+    ult_index = 0 if "전투사" in current_ult else 1
+    
     player_ult_type = st.selectbox(
         "✨ 내 궁극기 선택 (게임 시작 후 변경 불가)", 
         ["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"],
-        index=0 if "전투사" in st.session_state.player_ult_type else 1,
+        index=ult_index,
         disabled=is_game_started
     )
-    # 선택된 궁극기를 세션에 저장
     st.session_state.player_ult_type = player_ult_type
 
 st.divider()
 
-# 안전한 상태 가져오기
 p_wait = st.session_state.get("player_wait_turns", 0)
 ai_wait = st.session_state.get("ai_wait_turns", 0)
 p_hp = st.session_state.get("player_hp", 5)
 ai_hp = st.session_state.get("ai_hp", 5)
-turn = st.session_state.get("turn", 1)
 p_ult = st.session_state.get("player_ultimate", 0)
 ai_ult = st.session_state.get("ai_ultimate", 0)
 p_cd = st.session_state.get("player_counter_cooldown", 0)
 p_phoenix = st.session_state.get("player_phoenix_turns", 0)
 ai_phoenix = st.session_state.get("ai_phoenix_turns", 0)
+ai_ult_type = st.session_state.get("ai_ult_type", "전투사 (공격력 3 / 실패시 피-1)")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -142,7 +143,7 @@ with col3:
     ai_buff_text = f" 🔥버프({ai_wait}턴)" if ai_wait > 0 else ""
     ai_ult_text = f" ✨게이지({ai_ult}/3)"
     ai_phoenix_text = f" 🦅피닉스({ai_phoenix}턴)" if ai_phoenix > 0 else ""
-    st.metric("상대 체력", f"{render_hp(ai_hp)}{ai_buff_text}{ai_phoenix_text}\n{ai_ult_text} (상대 궁: {st.session_state.ai_ult_type.split()[0]})")
+    st.metric("상대 체력", f"{render_hp(ai_hp)}{ai_buff_text}{ai_phoenix_text}\n{ai_ult_text} (상대 궁: {ai_ult_type.split()[0]})")
 
 st.divider()
 
@@ -291,14 +292,14 @@ else:
         # --- AI 행동 처리 ---
         if ai_choice == "필살기":
             st.session_state.ai_ultimate = 0
-            if "전투사" in st.session_state.ai_ult_type:
+            if "전투사" in ai_ult_type:
                 if player_choice in ["방어", "반격"]:
                     ai_self_damage += 1
                     log_message += f"⚔️ [상대 전투사 궁극기 실패!] 당신의 방어/반격에 막혀 상대 체력이 1 깎였습니다!\n"
                 else:
                     ai_dmg_deal += 3
                     log_message += f"⚔️ [상대 전투사 궁극기 작렬!] 당신이 3의 강력한 대미지를 입었습니다!\n"
-            elif "피닉스" in st.session_state.ai_ult_type:
+            elif "피닉스" in ai_ult_type:
                 st.session_state.ai_phoenix_turns = 2
                 log_message += f"🦅 [상대 피닉스 부활 발동!] 앞으로 2턴 내 사망 시 풀피로 부활합니다!\n"
                 
