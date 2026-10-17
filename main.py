@@ -1,10 +1,10 @@
 import streamlit as st
 import random
 
-# 페이지 설정
+# 페이지 설정 (가장 처음에 위치해야 함)
 st.set_page_config(page_title="심리전 턴제 게임", page_icon="🎮", layout="centered")
 
-# 세션 상태 초기화 (게임 데이터 유지)
+# 세션 상태 초기화 (데이터가 없는 경우에만 안전하게 생성)
 if "initialized" not in st.session_state:
     st.session_state.max_hp = 5
     st.session_state.player_hp = 5
@@ -15,7 +15,6 @@ if "initialized" not in st.session_state:
     st.session_state.game_over = False
     st.session_state.winner = None
     st.session_state.log = "게임을 시작합니다! 난이도를 고르고 버튼을 선택해주세요."
-    # 플레이어의 최근 행동 기록 저장용 (최근 3개)
     st.session_state.player_history = []
     st.session_state.initialized = True
 
@@ -46,21 +45,17 @@ def get_ai_choice(difficulty, player_history):
     last_action = player_history[-1]
     
     if difficulty == "보통":
-        # 보통: 직전 플레이어 행동에 대응하는 가중치 부여
-        # 플레이어가 공격했으면 방어 확률을 높임
         weights = []
         for c in choices:
             if last_action == "공격" and c == "방어":
-                weights.append(4)  # 방어 가중치 높임
+                weights.append(4)
             elif last_action == "존버" and c == "공격":
-                weights.append(4)  # 존버할 때 공격 가중치 높임
+                weights.append(4)
             else:
                 weights.append(1)
         return random.choices(choices, weights=weights, k=1)[0]
         
     elif difficulty == "매운맛":
-        # 매운맛: 플레이어의 최근 패턴을 분석하여 카운터 타격
-        # 최근 행동 중 공격 비중이 높다면 방어/존버 위주로, 존버 비중이 높다면 선공격
         attack_count = player_history.count("공격")
         wait_count = player_history.count("존버")
         
@@ -86,21 +81,27 @@ difficulty = st.radio("🤖 AI 난이도 선택", ["보통", "매운맛"], horiz
 
 st.divider()
 
-# 상단 체력 및 턴 표시
+# 상단 체력 및 턴 표시 (안전하게 .get() 또는 세션 상태 체크 후 출력)
+p_wait = st.session_state.get("player_wait_turns", 0)
+ai_wait = st.session_state.get("ai_wait_turns", 0)
+p_hp = st.session_state.get("player_hp", 5)
+ai_hp = st.session_state.get("ai_hp", 5)
+turn = st.session_state.get("turn", 1)
+
 col1, col2, col3 = st.columns(3)
 with col1:
-    buff_text = f" 🔥버프({st.session_state.player_wait_turns}턴)" if st.session_state.player_wait_turns > 0 else ""
-    st.metric("내 체력", f"{render_hp(st.session_state.player_hp)}{buff_text}")
+    buff_text = f" 🔥버프({p_wait}턴)" if p_wait > 0 else ""
+    st.metric("내 체력", f"{render_hp(p_hp)}{buff_text}")
 with col2:
-    st.metric("현재 턴", f"{st.session_state.turn}턴")
+    st.metric("현재 턴", f"{turn}턴")
 with col3:
-    ai_buff_text = f" 🔥버프({st.session_state.ai_wait_turns}턴)" if st.session_state.ai_wait_turns > 0 else ""
-    st.metric("상대 체력", f"{render_hp(st.session_state.ai_hp)}{ai_buff_text}")
+    ai_buff_text = f" 🔥버프({ai_wait}턴)" if ai_wait > 0 else ""
+    st.metric("상대 체력", f"{render_hp(ai_hp)}{ai_buff_text}")
 
 st.divider()
 
 # 게임 종료 확인
-if st.session_state.game_over:
+if st.session_state.get("game_over", False):
     if st.session_state.winner == "player":
         st.success("🎉 승리했습니다! 상대를 쓰러트렸어요!")
     elif st.session_state.winner == "ai":
@@ -133,15 +134,12 @@ else:
 
     # 플레이어가 행동을 골랐을 때 로직 처리
     if player_choice:
-        # 플레이어 기록 저장 (최근 5개만 유지)
         st.session_state.player_history.append(player_choice)
         if len(st.session_state.player_history) > 5:
             st.session_state.player_history.pop(0)
 
-        # 지능형 AI 선택 호출
         ai_choice = get_ai_choice(difficulty, st.session_state.player_history)
         
-        # 10턴 이상일 때 공격 피해량 설정 (기본 1, 10턴 이상 2)
         base_damage = 2 if st.session_state.turn >= 10 else 1
         
         log_message = f"**[결과 ({difficulty} 난이도)]** 당신: {player_choice} | 상대: {ai_choice}\n\n"
@@ -242,4 +240,4 @@ else:
 # 게임 로그 출력 영역
 st.divider()
 st.subheader("📜 이번 턴 기록")
-st.info(st.session_state.log)
+st.info(st.session_state.get("log", "게임을 시작해주세요!"))
