@@ -16,6 +16,8 @@ if "initialized" not in st.session_state:
     st.session_state.ai_consecutive = 0
     st.session_state.player_ultimate = 0
     st.session_state.ai_ultimate = 0
+    st.session_state.player_counter_cooldown = 0
+    st.session_state.ai_counter_cooldown = 0
     st.session_state.game_over = False
     st.session_state.winner = None
     st.session_state.log = "매운맛 심리전 게임에 오신 것을 환영합니다! 난이도를 고르고 행동을 선택하세요."
@@ -32,6 +34,8 @@ def reset_game():
     st.session_state.ai_consecutive = 0
     st.session_state.player_ultimate = 0
     st.session_state.ai_ultimate = 0
+    st.session_state.player_counter_cooldown = 0
+    st.session_state.ai_counter_cooldown = 0
     st.session_state.game_over = False
     st.session_state.winner = None
     st.session_state.player_history = []
@@ -42,14 +46,15 @@ def render_hp(current_hp, max_hp=5):
     black_hearts = "🖤" * (max_hp - current_hp)
     return f"{red_hearts}{black_hearts} ({current_hp}/{max_hp})"
 
-# 스마트 AI 선택 로직 (난이도 반영)
-def get_ai_choice(difficulty, player_history, ai_ultimate):
-    # AI가 필살기 게이지가 찼다면 높은 확률로 필살기 사용
+# 스마트 AI 선택 로직 (난이도 및 반격 쿨다운 반영)
+def get_ai_choice(difficulty, player_history, ai_ultimate, ai_counter_cooldown):
     if ai_ultimate >= 3 and random.random() < 0.7:
         return "필살기"
         
-    choices = ["공격", "방어", "치료", "존버", "반격"]
-    
+    choices = ["공격", "방어", "치료", "존버"]
+    if ai_counter_cooldown == 0:
+        choices.append("반격")
+        
     if not player_history:
         return random.choice(choices)
     
@@ -73,7 +78,7 @@ def get_ai_choice(difficulty, player_history, ai_ultimate):
         weights = []
         for c in choices:
             if attack_count >= 2 and c == "반격":
-                weights.append(5) # 플레이어가 공격 위주면 반격 카운터
+                weights.append(5)
             elif wait_count > 0 and c == "공격":
                 weights.append(4)
             elif c == "치료" and random.random() < 0.3:
@@ -98,6 +103,7 @@ ai_hp = st.session_state.get("ai_hp", 5)
 turn = st.session_state.get("turn", 1)
 p_ult = st.session_state.get("player_ultimate", 0)
 ai_ult = st.session_state.get("ai_ultimate", 0)
+p_cd = st.session_state.get("player_counter_cooldown", 0)
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -127,7 +133,6 @@ if st.session_state.get("game_over", False):
 else:
     st.subheader("행동을 선택하세요")
     
-    # 버튼 배치 (5개 + 필살기 버튼 조건부)
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     
     player_choice = None
@@ -144,10 +149,13 @@ else:
         if st.button("⏳ 존버"):
             player_choice = "존버"
     with c5:
-        if st.button("🥊 반격"):
-            player_choice = "반격"
+        # 반격 쿨다운 중이면 버튼 비활성화
+        if p_cd > 0:
+            st.button(f"🥊 반격({p_cd}턴)", disabled=True)
+        else:
+            if st.button("🥊 반격"):
+                player_choice = "반격"
     with c6:
-        # 필살기 게이지가 3일 때만 활성화
         if p_ult >= 3:
             if st.button("✨ 필살기"):
                 player_choice = "필살기"
@@ -162,7 +170,7 @@ else:
         if len(st.session_state.player_history) > 5:
             st.session_state.player_history.pop(0)
 
-        ai_choice = get_ai_choice(difficulty, st.session_state.player_history, st.session_state.ai_ultimate)
+        ai_choice = get_ai_choice(difficulty, st.session_state.player_history, st.session_state.ai_ultimate, st.session_state.ai_counter_cooldown)
         
         base_damage = 2 if st.session_state.turn >= 10 else 1
         log_message = f"**[결과 ({difficulty} 난이도)]** 당신: {player_choice} | 상대: {ai_choice}\n\n"
@@ -170,7 +178,7 @@ else:
         p_dmg_deal = 0
         ai_dmg_deal = 0
         
-        # --- 연속 공격 처리 초기화 ---
+        # 연속 공격 처리
         if player_choice == "공격":
             st.session_state.player_consecutive += 1
         else:
@@ -181,15 +189,13 @@ else:
         else:
             st.session_state.ai_consecutive = 0
 
-        # --- 플레이어 행동 & 상호작용 검사 ---
-        # 1. 연속 공격 패널티 (3회 연속 공격 시 이번 공격 무효 및 지침)
         is_player_exhausted = st.session_state.player_consecutive >= 3
         is_ai_exhausted = st.session_state.ai_consecutive >= 3
 
-        # 플레이어 공격 처리
+        # 플레이어 행동 처리
         if player_choice == "필살기":
-            p_dmg_deal = 3  # 방어 불가 고정 대미지
-            st.session_state.player_ultimate = 0  # 게이지 소모
+            p_dmg_deal = 3
+            st.session_state.player_ultimate = 0
             log_message += f"✨ 당신의 필살기 작렬! 상대에게 3의 강력한 대미지를 줬습니다!\n"
         elif player_choice == "공격":
             if is_player_exhausted:
@@ -201,7 +207,7 @@ else:
                     st.session_state.player_wait_turns -= 1
             elif ai_choice == "반격":
                 log_message += "💥 상대의 반격에 당했습니다! 공격이 카운터당해 대미지를 입습니다!\n"
-                ai_dmg_deal += base_damage + 1 # 반격 성공 보너스 대미지
+                ai_dmg_deal += base_damage + 1
             else:
                 has_buff = st.session_state.player_wait_turns > 0
                 p_dmg_deal = base_damage * (2 if has_buff else 1)
@@ -226,7 +232,6 @@ else:
                 
         elif player_choice == "존버":
             st.session_state.player_wait_turns = 2
-            # 방어/존버 성공 시 필살기 게이지 1 충전
             if st.session_state.player_ultimate < 3:
                 st.session_state.player_ultimate += 1
             log_message += "⏳ 존버(대기) 상태 돌입! (필살기 게이지 +1)\n"
@@ -239,14 +244,14 @@ else:
                 st.session_state.player_wait_turns -= 1
                 
         elif player_choice == "반격":
+            st.session_state.player_counter_cooldown = 2 # 반격 사용 시 2턴 쿨다운 설정
             if ai_choice == "공격" and not is_ai_exhausted:
                 p_dmg_deal += base_damage + 1
                 log_message += f"🥊 완벽한 반격 성공! 상대의 공격을 받아쳐 {p_dmg_deal}의 대미지를 돌려줬습니다!\n"
             else:
-                log_message += "❌ 반격 실패! 상대가 공격하지 않았습니다.\n"
+                log_message += "❌ 반격 실패! 상대가 공격하지 않았습니다. (반격 쿨다운 2턴 시작)\n"
 
-
-        # AI 공격 처리
+        # AI 행동 처리
         if ai_choice == "필살기":
             ai_dmg_deal += 3
             st.session_state.ai_ultimate = 0
@@ -297,11 +302,18 @@ else:
                 st.session_state.ai_wait_turns -= 1
                 
         elif ai_choice == "반격":
+            st.session_state.ai_counter_cooldown = 2
             if player_choice == "공격" and not is_player_exhausted:
                 ai_dmg_deal += base_damage + 1
                 log_message += f"❌ 상대의 반격에 당해 추가 대미지를 입었습니다!\n"
             else:
                 log_message += "▶ 상대의 반격이 헛스윙으로 끝났습니다.\n"
+
+        # 턴이 지날 때마다 반격 쿨다운 1씩 감소
+        if st.session_state.player_counter_cooldown > 0:
+            st.session_state.player_counter_cooldown -= 1
+        if st.session_state.ai_counter_cooldown > 0:
+            st.session_state.ai_counter_cooldown -= 1
 
         # 최종 체력 반영
         st.session_state.player_hp = max(0, st.session_state.player_hp - ai_dmg_deal)
