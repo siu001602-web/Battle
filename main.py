@@ -2,7 +2,7 @@ import streamlit as st
 import random
 
 # 페이지 설정
-st.set_page_config(page_title="심리전 턴제 게임 - 궁극기 선택", page_icon="🎮", layout="centered")
+st.set_page_config(page_title="심리전 턴제 게임 - 궁극기 고정", page_icon="🎮", layout="centered")
 
 # 세션 상태 초기화
 if "initialized" not in st.session_state:
@@ -18,13 +18,15 @@ if "initialized" not in st.session_state:
     st.session_state.ai_ultimate = 0
     st.session_state.player_counter_cooldown = 0
     st.session_state.ai_counter_cooldown = 0
-    # 피닉스 부활 남은 턴 (0이면 없음, 사용 시 2로 설정)
     st.session_state.player_phoenix_turns = 0
     st.session_state.ai_phoenix_turns = 0
     st.session_state.game_over = False
     st.session_state.winner = None
     st.session_state.log = "궁극기 능력을 선택하고 게임을 시작하세요!"
     st.session_state.player_history = []
+    # 게임 시작 전 선택할 임시 기본값
+    st.session_state.player_ult_type = "전투사 (공격력 3 / 실패시 피-1)"
+    st.session_state.ai_ult_type = random.choice(["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"])
     st.session_state.initialized = True
 
 def reset_game():
@@ -45,6 +47,7 @@ def reset_game():
     st.session_state.winner = None
     st.session_state.player_history = []
     st.session_state.log = "게임이 초기화되었습니다. 다시 시작하세요!"
+    st.session_state.ai_ult_type = random.choice(["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"])
 
 def render_hp(current_hp, max_hp=5):
     red_hearts = "❤️" * current_hp
@@ -97,16 +100,21 @@ def get_ai_choice(difficulty, player_history, ai_ultimate, ai_counter_cooldown):
 st.title("🔥 하드코어 심리전 턴제 게임")
 st.write("공격, 방어, 치료, 존버, 반격, 그리고 궁극기를 활용해 상대를 쓰러트리세요!")
 
-# 설정 영역: 난이도 및 플레이어 궁극기 선택
+# 1턴일 때만 능력을 변경할 수 있고, 게임이 진행되면 변경 불가하도록 설정
+is_game_started = st.session_state.turn > 1
+
 col_opt1, col_opt2 = st.columns(2)
 with col_opt1:
-    difficulty = st.radio("🤖 AI 난이도", ["보통", "매운맛"], horizontal=True)
+    difficulty = st.radio("🤖 AI 난이도", ["보통", "매운맛"], horizontal=True, disabled=is_game_started)
 with col_opt2:
-    player_ult_type = st.selectbox("✨ 내 궁극기 선택", ["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"])
-
-# 게임 시작 시 AI 궁극기 랜덤 부여 (없을 경우)
-if "ai_ult_type" not in st.session_state:
-    st.session_state.ai_ult_type = random.choice(["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"])
+    player_ult_type = st.selectbox(
+        "✨ 내 궁극기 선택 (게임 시작 후 변경 불가)", 
+        ["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"],
+        index=0 if "전투사" in st.session_state.player_ult_type else 1,
+        disabled=is_game_started
+    )
+    # 선택된 궁극기를 세션에 저장
+    st.session_state.player_ult_type = player_ult_type
 
 st.divider()
 
@@ -148,8 +156,6 @@ if st.session_state.get("game_over", False):
     
     if st.button("다시 시작하기"):
         reset_game()
-        if "ai_ult_type" in st.session_state:
-            del st.session_state.ai_ult_type
         st.rerun()
 else:
     st.subheader("행동을 선택하세요")
@@ -217,15 +223,14 @@ else:
         # --- 플레이어 행동 처리 ---
         if player_choice == "필살기":
             st.session_state.player_ultimate = 0
-            if "전투사" in player_ult_type:
-                # 전투사 궁극기: 상대가 방어/반격하면 실패하여 피 -1, 아니면 대미지 3
+            if "전투사" in st.session_state.player_ult_type:
                 if ai_choice in ["방어", "반격"]:
                     p_self_damage += 1
                     log_message += f"⚔️ [전투사 궁극기 실패!] 상대의 방어/반격에 막혀 체력이 1 깎였습니다!\n"
                 else:
                     p_dmg_deal = 3
                     log_message += f"⚔️ [전투사 궁극기 작렬!] 상대에게 3의 강력한 대미지를 줬습니다!\n"
-            elif "피닉스" in player_ult_type:
+            elif "피닉스" in st.session_state.player_ult_type:
                 st.session_state.player_phoenix_turns = 2
                 log_message += f"🦅 [피닉스 부활 발동!] 앞으로 2턴 내에 사망 시 체력이 풀피로 부활합니다!\n"
                 
