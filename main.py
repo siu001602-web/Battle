@@ -149,7 +149,7 @@ else:
         if st.button("⏳ 존버"):
             player_choice = "존버"
     with c5:
-        # 반격 쿨다운 중이면 버튼 비활성화
+        # 반격 쿨다운 중이면 버튼 비활성화 (3턴)
         if p_cd > 0:
             st.button(f"🥊 반격({p_cd}턴)", disabled=True)
         else:
@@ -244,12 +244,12 @@ else:
                 st.session_state.player_wait_turns -= 1
                 
         elif player_choice == "반격":
-            st.session_state.player_counter_cooldown = 2 # 반격 사용 시 2턴 쿨다운 설정
+            st.session_state.player_counter_cooldown = 3 # 반격 쿨다운 3턴 설정
             if ai_choice == "공격" and not is_ai_exhausted:
                 p_dmg_deal += base_damage + 1
-                log_message += f"🥊 완벽한 반격 성공! 상대의 공격을 받아쳐 {p_dmg_deal}의 대미지를 돌려줬습니다!\n"
+                log_message += f"🥊 완벽한 반격 성공! 상대의 공격을 받아쳐 {p_dmg_deal}의 대미지를 돌려줬습니다! (반격 쿨다운 3턴 시작)\n"
             else:
-                log_message += "❌ 반격 실패! 상대가 공격하지 않았습니다. (반격 쿨다운 2턴 시작)\n"
+                log_message += "❌ 반격 실패! 상대가 공격하지 않았습니다. (반격 쿨다운 3턴 시작)\n"
 
         # AI 행동 처리
         if ai_choice == "필살기":
@@ -302,7 +302,7 @@ else:
                 st.session_state.ai_wait_turns -= 1
                 
         elif ai_choice == "반격":
-            st.session_state.ai_counter_cooldown = 2
+            st.session_state.ai_counter_cooldown = 3 # AI 반격 쿨다운 3턴 설정
             if player_choice == "공격" and not is_player_exhausted:
                 ai_dmg_deal += base_damage + 1
                 log_message += f"❌ 상대의 반격에 당해 추가 대미지를 입었습니다!\n"
