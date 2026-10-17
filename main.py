@@ -1,10 +1,10 @@
 import streamlit as st
 import random
 
-# 페이지 설정 (가장 처음에 위치해야 함)
-st.set_page_config(page_title="심리전 턴제 게임", page_icon="🎮", layout="centered")
+# 페이지 설정
+st.set_page_config(page_title="심리전 턴제 게임 - 궁극의 심리전", page_icon="🎮", layout="centered")
 
-# 세션 상태 초기화 (데이터가 없는 경우에만 안전하게 생성)
+# 세션 상태 초기화
 if "initialized" not in st.session_state:
     st.session_state.max_hp = 5
     st.session_state.player_hp = 5
@@ -12,9 +12,13 @@ if "initialized" not in st.session_state:
     st.session_state.turn = 1
     st.session_state.player_wait_turns = 0
     st.session_state.ai_wait_turns = 0
+    st.session_state.player_consecutive = 0
+    st.session_state.ai_consecutive = 0
+    st.session_state.player_ultimate = 0
+    st.session_state.ai_ultimate = 0
     st.session_state.game_over = False
     st.session_state.winner = None
-    st.session_state.log = "게임을 시작합니다! 난이도를 고르고 버튼을 선택해주세요."
+    st.session_state.log = "매운맛 심리전 게임에 오신 것을 환영합니다! 난이도를 고르고 행동을 선택하세요."
     st.session_state.player_history = []
     st.session_state.initialized = True
 
@@ -24,20 +28,27 @@ def reset_game():
     st.session_state.turn = 1
     st.session_state.player_wait_turns = 0
     st.session_state.ai_wait_turns = 0
+    st.session_state.player_consecutive = 0
+    st.session_state.ai_consecutive = 0
+    st.session_state.player_ultimate = 0
+    st.session_state.ai_ultimate = 0
     st.session_state.game_over = False
     st.session_state.winner = None
     st.session_state.player_history = []
     st.session_state.log = "게임이 초기화되었습니다. 다시 시작하세요!"
 
-# 체력을 하트(❤️/🖤) 5칸으로 보여주는 함수
 def render_hp(current_hp, max_hp=5):
     red_hearts = "❤️" * current_hp
     black_hearts = "🖤" * (max_hp - current_hp)
     return f"{red_hearts}{black_hearts} ({current_hp}/{max_hp})"
 
-# 스마트 AI의 선택 로직
-def get_ai_choice(difficulty, player_history):
-    choices = ["공격", "방어", "치료", "존버"]
+# 스마트 AI 선택 로직 (난이도 반영)
+def get_ai_choice(difficulty, player_history, ai_ultimate):
+    # AI가 필살기 게이지가 찼다면 높은 확률로 필살기 사용
+    if ai_ultimate >= 3 and random.random() < 0.7:
+        return "필살기"
+        
+    choices = ["공격", "방어", "치료", "존버", "반격"]
     
     if not player_history:
         return random.choice(choices)
@@ -47,8 +58,8 @@ def get_ai_choice(difficulty, player_history):
     if difficulty == "보통":
         weights = []
         for c in choices:
-            if last_action == "공격" and c == "방어":
-                weights.append(4)
+            if last_action == "공격" and c in ["방어", "반격"]:
+                weights.append(3)
             elif last_action == "존버" and c == "공격":
                 weights.append(4)
             else:
@@ -61,8 +72,8 @@ def get_ai_choice(difficulty, player_history):
         
         weights = []
         for c in choices:
-            if attack_count >= len(player_history) / 2 and c == "방어":
-                weights.append(5)
+            if attack_count >= 2 and c == "반격":
+                weights.append(5) # 플레이어가 공격 위주면 반격 카운터
             elif wait_count > 0 and c == "공격":
                 weights.append(4)
             elif c == "치료" and random.random() < 0.3:
@@ -73,39 +84,40 @@ def get_ai_choice(difficulty, player_history):
     
     return random.choice(choices)
 
-st.title("🎮 심리전 턴제 미니게임")
-st.write("공격, 방어, 치료, 존버(대기) 중 하나를 선택해 상대를 쓰러트리세요!")
+st.title("🔥 하드코어 심리전 턴제 게임")
+st.write("공격, 방어, 치료, 존버, 반격, 그리고 필살기를 활용해 상대를 쓰러트리세요!")
 
-# 난이도 선택 라디오 버튼
 difficulty = st.radio("🤖 AI 난이도 선택", ["보통", "매운맛"], horizontal=True)
-
 st.divider()
 
-# 안전하게 세션 상태 불러오기 (.get 활용)
+# 안전한 상태 가져오기
 p_wait = st.session_state.get("player_wait_turns", 0)
 ai_wait = st.session_state.get("ai_wait_turns", 0)
 p_hp = st.session_state.get("player_hp", 5)
 ai_hp = st.session_state.get("ai_hp", 5)
 turn = st.session_state.get("turn", 1)
+p_ult = st.session_state.get("player_ultimate", 0)
+ai_ult = st.session_state.get("ai_ultimate", 0)
 
 col1, col2, col3 = st.columns(3)
 with col1:
     buff_text = f" 🔥버프({p_wait}턴)" if p_wait > 0 else ""
-    st.metric("내 체력", f"{render_hp(p_hp)}{buff_text}")
+    ult_text = f" ✨필살기게이지({p_ult}/3)"
+    st.metric("내 체력", f"{render_hp(p_hp)}{buff_text}\n{ult_text}")
 with col2:
     st.metric("현재 턴", f"{turn}턴")
 with col3:
     ai_buff_text = f" 🔥버프({ai_wait}턴)" if ai_wait > 0 else ""
-    st.metric("상대 체력", f"{render_hp(ai_hp)}{ai_buff_text}")
+    ai_ult_text = f" ✨필살기게이지({ai_ult}/3)"
+    st.metric("상대 체력", f"{render_hp(ai_hp)}{ai_buff_text}\n{ai_ult_text}")
 
 st.divider()
 
-# 게임 종료 확인
 if st.session_state.get("game_over", False):
     if st.session_state.winner == "player":
-        st.success("🎉 승리했습니다! 상대를 쓰러트렸어요!")
+        st.success("🎉 승리했습니다! 상대를 완벽하게 제압했어요!")
     elif st.session_state.winner == "ai":
-        st.error("💀 패배했습니다... 상대에게 졌습니다.")
+        st.error("💀 패배했습니다... 상대의 심리전에 당했습니다.")
     else:
         st.info("🤝 무승부입니다!")
     
@@ -115,8 +127,8 @@ if st.session_state.get("game_over", False):
 else:
     st.subheader("행동을 선택하세요")
     
-    # 버튼 배치
-    c1, c2, c3, c4 = st.columns(4)
+    # 버튼 배치 (5개 + 필살기 버튼 조건부)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
     
     player_choice = None
     with c1:
@@ -131,10 +143,18 @@ else:
     with c4:
         if st.button("⏳ 존버"):
             player_choice = "존버"
+    with c5:
+        if st.button("🥊 반격"):
+            player_choice = "반격"
+    with c6:
+        # 필살기 게이지가 3일 때만 활성화
+        if p_ult >= 3:
+            if st.button("✨ 필살기"):
+                player_choice = "필살기"
+        else:
+            st.button("✨ 필살기", disabled=True)
 
-    # 플레이어가 행동을 골랐을 때 로직 처리
     if player_choice:
-        # 안전하게 player_history가 없다면 생성 후 추가
         if "player_history" not in st.session_state:
             st.session_state.player_history = []
             
@@ -142,93 +162,155 @@ else:
         if len(st.session_state.player_history) > 5:
             st.session_state.player_history.pop(0)
 
-        ai_choice = get_ai_choice(difficulty, st.session_state.player_history)
+        ai_choice = get_ai_choice(difficulty, st.session_state.player_history, st.session_state.ai_ultimate)
         
         base_damage = 2 if st.session_state.turn >= 10 else 1
-        
         log_message = f"**[결과 ({difficulty} 난이도)]** 당신: {player_choice} | 상대: {ai_choice}\n\n"
         
-        # --- 플레이어 행동 처리 ---
         p_dmg_deal = 0
+        ai_dmg_deal = 0
+        
+        # --- 연속 공격 처리 초기화 ---
         if player_choice == "공격":
-            if ai_choice != "방어":
+            st.session_state.player_consecutive += 1
+        else:
+            st.session_state.player_consecutive = 0
+            
+        if ai_choice == "공격":
+            st.session_state.ai_consecutive += 1
+        else:
+            st.session_state.ai_consecutive = 0
+
+        # --- 플레이어 행동 & 상호작용 검사 ---
+        # 1. 연속 공격 패널티 (3회 연속 공격 시 이번 공격 무효 및 지침)
+        is_player_exhausted = st.session_state.player_consecutive >= 3
+        is_ai_exhausted = st.session_state.ai_consecutive >= 3
+
+        # 플레이어 공격 처리
+        if player_choice == "필살기":
+            p_dmg_deal = 3  # 방어 불가 고정 대미지
+            st.session_state.player_ultimate = 0  # 게이지 소모
+            log_message += f"✨ 당신의 필살기 작렬! 상대에게 3의 강력한 대미지를 줬습니다!\n"
+        elif player_choice == "공격":
+            if is_player_exhausted:
+                log_message += "⚠️ 연속 공격으로 지쳐서 공격이 빗나갔습니다!\n"
+                st.session_state.player_consecutive = 0
+            elif ai_choice == "방어":
+                log_message += "▶ 당신의 공격이 상대의 방어에 막혔습니다!\n"
+                if st.session_state.player_wait_turns > 0:
+                    st.session_state.player_wait_turns -= 1
+            elif ai_choice == "반격":
+                log_message += "💥 상대의 반격에 당했습니다! 공격이 카운터당해 대미지를 입습니다!\n"
+                ai_dmg_deal += base_damage + 1 # 반격 성공 보너스 대미지
+            else:
                 has_buff = st.session_state.player_wait_turns > 0
                 p_dmg_deal = base_damage * (2 if has_buff else 1)
-                log_message += f"▶ 당신의 공격 성공! 상대에게 {p_dmg_deal}의 데미지를 줬습니다."
+                log_message += f"▶ 당신의 공격 성공! 상대에게 {p_dmg_deal}의 대미지를 줬습니다."
                 if has_buff:
                     log_message += " (존버 버프 사용!)\n"
                     st.session_state.player_wait_turns = 0
                 else:
                     log_message += "\n"
-            else:
-                log_message += "▶ 당신의 공격이 상대의 방어에 막혔습니다!\n"
-                if st.session_state.player_wait_turns > 0:
-                    st.session_state.player_wait_turns -= 1
-            
+                    
         elif player_choice == "치료":
-            if st.session_state.player_hp < st.session_state.max_hp:
-                st.session_state.player_hp += 1
-                log_message += "▶ 치료 성공! 체력이 1 회복되었습니다.\n"
+            if ai_choice == "공격" and not is_ai_exhausted:
+                log_message += "⚠️ 치료 중 상대에게 공격당해 치료가 실패하고 대미지를 입었습니다!\n"
             else:
-                log_message += "▶ 체력이 이미 가득 차 있어 치료가 실패했습니다.\n"
-            
+                if st.session_state.player_hp < st.session_state.max_hp:
+                    st.session_state.player_hp += 1
+                    log_message += "💊 치료 성공! 체력이 1 회복되었습니다.\n"
+                else:
+                    log_message += "▶ 체력이 이미 가득 차 있습니다.\n"
             if st.session_state.player_wait_turns > 0:
                 st.session_state.player_wait_turns -= 1
-            
+                
         elif player_choice == "존버":
             st.session_state.player_wait_turns = 2
-            log_message += "▶ 존버(대기) 상태! 앞으로 2턴 동안 공격 성공 시 데미지가 2배가 됩니다.\n"
+            # 방어/존버 성공 시 필살기 게이지 1 충전
+            if st.session_state.player_ultimate < 3:
+                st.session_state.player_ultimate += 1
+            log_message += "⏳ 존버(대기) 상태 돌입! (필살기 게이지 +1)\n"
             
         elif player_choice == "방어":
-            log_message += "▶ 방어 태세를 취했습니다.\n"
+            if st.session_state.player_ultimate < 3:
+                st.session_state.player_ultimate += 1
+            log_message += "🛡️ 방어 태세! (필살기 게이지 +1)\n"
             if st.session_state.player_wait_turns > 0:
                 st.session_state.player_wait_turns -= 1
+                
+        elif player_choice == "반격":
+            if ai_choice == "공격" and not is_ai_exhausted:
+                p_dmg_deal += base_damage + 1
+                log_message += f"🥊 완벽한 반격 성공! 상대의 공격을 받아쳐 {p_dmg_deal}의 대미지를 돌려줬습니다!\n"
+            else:
+                log_message += "❌ 반격 실패! 상대가 공격하지 않았습니다.\n"
 
-        # --- AI 행동 처리 ---
-        ai_dmg_deal = 0
-        if ai_choice == "공격":
-            if player_choice != "방어":
+
+        # AI 공격 처리
+        if ai_choice == "필살기":
+            ai_dmg_deal += 3
+            st.session_state.ai_ultimate = 0
+            log_message += f"✨ 상대의 필살기 작렬! 당신이 3의 강력한 대미지를 입었습니다!\n"
+        elif ai_choice == "공격":
+            if is_ai_exhausted:
+                log_message += "⚠️ 상대가 지쳐서 공격이 빗나갔습니다!\n"
+                st.session_state.ai_consecutive = 0
+            elif player_choice == "방어":
+                log_message += "▶ 상대의 공격을 완벽하게 방어해냈습니다!\n"
+                if st.session_state.ai_wait_turns > 0:
+                    st.session_state.ai_wait_turns -= 1
+            elif player_choice == "반격":
+                log_message += "▶ 상대의 공격을 반격하여 무효화했습니다!\n"
+            else:
                 ai_has_buff = st.session_state.ai_wait_turns > 0
-                ai_dmg_deal = base_damage * (2 if ai_has_buff else 1)
-                log_message += f"▶ 상대의 공격 명중! 당신이 {ai_dmg_deal}의 데미지를 입었습니다."
+                ai_dmg_deal += base_damage * (2 if ai_has_buff else 1)
+                log_message += f"▶ 상대의 공격 명중! 당신이 {ai_dmg_deal}의 대미지를 입었습니다."
                 if ai_has_buff:
                     log_message += " (상대 존버 버프 사용!)\n"
                     st.session_state.ai_wait_turns = 0
                 else:
                     log_message += "\n"
-            else:
-                log_message += "▶ 상대의 공격을 방어해냈습니다!\n"
-                if st.session_state.ai_wait_turns > 0:
-                    st.session_state.ai_wait_turns -= 1
-            
+                    
         elif ai_choice == "치료":
-            if st.session_state.ai_hp < st.session_state.max_hp:
-                st.session_state.ai_hp += 1
-                log_message += "▶ 상대가 치료하여 체력을 1 회복했습니다.\n"
+            if player_choice == "공격" and not is_player_exhausted:
+                log_message += "⚠️ 상대가 치료 중 당신의 공격을 받아 치료가 실패했습니다!\n"
             else:
-                log_message += "▶ 상대의 치료가 실패했습니다.\n"
-            
+                if st.session_state.ai_hp < st.session_state.max_hp:
+                    st.session_state.ai_hp += 1
+                    log_message += "💊 상대가 치료에 성공해 체력을 1 회복했습니다.\n"
+                else:
+                    log_message += "▶ 상대의 치료가 실패했습니다.\n"
             if st.session_state.ai_wait_turns > 0:
                 st.session_state.ai_wait_turns -= 1
-            
+                
         elif ai_choice == "존버":
             st.session_state.ai_wait_turns = 2
-            log_message += "▶ 상대가 존버(대기) 상태에 돌입했습니다.\n"
+            if st.session_state.ai_ultimate < 3:
+                st.session_state.ai_ultimate += 1
+            log_message += "⏳ 상대가 존버(대기) 상태에 돌입했습니다. (상대 필살기 게이지 +1)\n"
             
         elif ai_choice == "방어":
-            log_message += "▶ 상대가 방어 태세를 취했습니다.\n"
+            if st.session_state.ai_ultimate < 3:
+                st.session_state.ai_ultimate += 1
+            log_message += "🛡️ 상대가 방어 태세를 취했습니다. (상대 필살기 게이지 +1)\n"
             if st.session_state.ai_wait_turns > 0:
                 st.session_state.ai_wait_turns -= 1
+                
+        elif ai_choice == "반격":
+            if player_choice == "공격" and not is_player_exhausted:
+                ai_dmg_deal += base_damage + 1
+                log_message += f"❌ 상대의 반격에 당해 추가 대미지를 입었습니다!\n"
+            else:
+                log_message += "▶ 상대의 반격이 헛스윙으로 끝났습니다.\n"
 
-        # 체력 반영
+        # 최종 체력 반영
         st.session_state.player_hp = max(0, st.session_state.player_hp - ai_dmg_deal)
         st.session_state.ai_hp = max(0, st.session_state.ai_hp - p_dmg_deal)
         
-        # 턴 증가
         st.session_state.turn += 1
         st.session_state.log = log_message
         
-        # 승리 조건 확인
+        # 승리/패배 판정
         if st.session_state.player_hp == 0 and st.session_state.ai_hp == 0:
             st.session_state.game_over = True
             st.session_state.winner = "draw"
@@ -241,7 +323,6 @@ else:
             
         st.rerun()
 
-# 게임 로그 출력 영역
 st.divider()
 st.subheader("📜 이번 턴 기록")
 st.info(st.session_state.get("log", "게임을 시작해주세요!"))
