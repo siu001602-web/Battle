@@ -18,14 +18,10 @@ if "initialized" not in st.session_state:
     st.session_state.ai_ultimate = 0
     st.session_state.player_counter_cooldown = 0
     st.session_state.ai_counter_cooldown = 0
-    st.session_state.player_phoenix_turns = 0
-    st.session_state.ai_phoenix_turns = 0
     st.session_state.game_over = False
     st.session_state.winner = None
     st.session_state.log = "심리전투를 시작합니다! 행동을 선택하세요."
     st.session_state.player_history = []
-    st.session_state.player_ult_type = "전투사 (공격력 3 / 실패시 피-1)"
-    st.session_state.ai_ult_type = random.choice(["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"])
     st.session_state.initialized = True
 
 def reset_game():
@@ -40,13 +36,10 @@ def reset_game():
     st.session_state.ai_ultimate = 0
     st.session_state.player_counter_cooldown = 0
     st.session_state.ai_counter_cooldown = 0
-    st.session_state.player_phoenix_turns = 0
-    st.session_state.ai_phoenix_turns = 0
     st.session_state.game_over = False
     st.session_state.winner = None
     st.session_state.player_history = []
     st.session_state.log = "게임이 초기화되었습니다. 다시 시작하세요!"
-    st.session_state.ai_ult_type = random.choice(["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"])
 
 def render_hp(current_hp, max_hp=5):
     red_hearts = "❤️" * current_hp
@@ -82,26 +75,7 @@ def get_ai_choice(player_history, ai_ultimate, ai_counter_cooldown):
     return random.choices(choices, weights=weights, k=1)[0]
 
 st.title("⚔️ 심리전 턴제 배틀")
-st.write("공격, 방어, 치료, 존버, 반격, 궁극기를 활용해 상대와 겨루세요!")
-
-# 설정 영역 (난이도 및 플레이어 궁극기 선택 - 1턴 이후 변경 불가)
-turn = st.session_state.get("turn", 1)
-is_game_started = turn > 1
-
-col_opt1, col_opt2 = st.columns(2)
-with col_opt1:
-    difficulty = st.radio("🤖 AI 난이도", ["보통", "매운맛"], horizontal=True, disabled=is_game_started)
-with col_opt2:
-    current_ult = st.session_state.get("player_ult_type", "전투사 (공격력 3 / 실패시 피-1)")
-    ult_index = 0 if "전투사" in current_ult else 1
-    
-    player_ult_type = st.selectbox(
-        "✨ 내 궁극기 선택", 
-        ["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"],
-        index=ult_index,
-        disabled=is_game_started
-    )
-    st.session_state.player_ult_type = player_ult_type
+st.write("공격, 방어, 치료, 존버, 반격, 필살기를 활용해 상대와 겨루세요!")
 
 st.divider()
 
@@ -110,26 +84,22 @@ p_wait = st.session_state.get("player_wait_turns", 0)
 ai_wait = st.session_state.get("ai_wait_turns", 0)
 p_hp = st.session_state.get("player_hp", 5)
 ai_hp = st.session_state.get("ai_hp", 5)
+turn = st.session_state.get("turn", 1)
 p_ult = st.session_state.get("player_ultimate", 0)
 ai_ult = st.session_state.get("ai_ultimate", 0)
 p_cd = st.session_state.get("player_counter_cooldown", 0)
-p_phoenix = st.session_state.get("player_phoenix_turns", 0)
-ai_phoenix = st.session_state.get("ai_phoenix_turns", 0)
-ai_ult_type = st.session_state.get("ai_ult_type", "전투사 (공격력 3 / 실패시 피-1)")
 
 col1, col2, col3 = st.columns(3)
 with col1:
     buff_text = f" 🔥버프({p_wait}턴)" if p_wait > 0 else ""
-    ult_text = f" ✨게이지({p_ult}/3)"
-    phoenix_text = f" 🦅피닉스({p_phoenix}턴)" if p_phoenix > 0 else ""
-    st.metric("내 체력", f"{render_hp(p_hp)}{buff_text}{phoenix_text}\n{ult_text}")
+    ult_text = f" ✨필살기게이지({p_ult}/3)"
+    st.metric("내 체력", f"{render_hp(p_hp)}{buff_text}\n{ult_text}")
 with col2:
     st.metric("현재 턴", f"{turn}턴")
 with col3:
     ai_buff_text = f" 🔥버프({ai_wait}턴)" if ai_wait > 0 else ""
-    ai_ult_text = f" ✨게이지({ai_ult}/3)"
-    ai_phoenix_text = f" 🦅피닉스({ai_phoenix}턴)" if ai_phoenix > 0 else ""
-    st.metric("상대 체력", f"{render_hp(ai_hp)}{ai_buff_text}{ai_phoenix_text}\n{ai_ult_text} (상대 궁: {ai_ult_type.split()[0]})")
+    ai_ult_text = f" ✨필살기게이지({ai_ult}/3)"
+    st.metric("상대 체력", f"{render_hp(ai_hp)}{ai_buff_text}\n{ai_ult_text}")
 
 st.divider()
 
@@ -170,10 +140,10 @@ else:
                 player_choice = "반격"
     with c6:
         if p_ult >= 3:
-            if st.button("✨ 궁극기"):
+            if st.button("✨ 필살기"):
                 player_choice = "필살기"
         else:
-            st.button("✨ 궁극기", disabled=True)
+            st.button("✨ 필살기", disabled=True)
 
     if player_choice:
         if "player_history" not in st.session_state:
@@ -190,8 +160,6 @@ else:
         
         p_dmg_deal = 0
         ai_dmg_deal = 0
-        p_self_damage = 0
-        ai_self_damage = 0
         
         if player_choice == "공격":
             st.session_state.player_consecutive += 1
@@ -209,16 +177,8 @@ else:
         # 플레이어 행동
         if player_choice == "필살기":
             st.session_state.player_ultimate = 0
-            if "전투사" in st.session_state.player_ult_type:
-                if ai_choice in ["방어", "반격"]:
-                    p_self_damage += 1
-                    log_message += f"⚔️ [전투사 궁극기 실패!] 상대의 방어/반격에 막혀 체력이 1 깎였습니다!\n"
-                else:
-                    p_dmg_deal = 3
-                    log_message += f"⚔️ [전투사 궁극기 작렬!] 상대에게 3의 대미지를 줬습니다!\n"
-            elif "피닉스" in st.session_state.player_ult_type:
-                st.session_state.player_phoenix_turns = 2
-                log_message += f"🦅 [피닉스 부활 발동!] 앞으로 2턴 내 사망 시 풀피로 부활합니다!\n"
+            p_dmg_deal = 3
+            log_message += f"✨ [필살기 작렬!] 상대에게 강력한 대미지 3을 줬습니다!\n"
                 
         elif player_choice == "공격":
             if is_player_exhausted:
@@ -257,12 +217,12 @@ else:
             st.session_state.player_wait_turns = 2
             if st.session_state.player_ultimate < 3:
                 st.session_state.player_ultimate += 1
-            log_message += "⏳ 존버 상태 돌입! (궁극기 게이지 +1)\n"
+            log_message += "⏳ 존버 상태 돌입! (필살기 게이지 +1)\n"
             
         elif player_choice == "방어":
             if st.session_state.player_ultimate < 3:
                 st.session_state.player_ultimate += 1
-            log_message += "🛡️ 방어 태세! (궁극기 게이지 +1)\n"
+            log_message += "🛡️ 방어 태세! (필살기 게이지 +1)\n"
             if st.session_state.player_wait_turns > 0:
                 st.session_state.player_wait_turns -= 1
                 
@@ -277,16 +237,8 @@ else:
         # AI 행동
         if ai_choice == "필살기":
             st.session_state.ai_ultimate = 0
-            if "전투사" in ai_ult_type:
-                if player_choice in ["방어", "반격"]:
-                    ai_self_damage += 1
-                    log_message += f"⚔️ [상대 전투사 궁극기 실패!] 당신의 방어/반격에 막혀 상대 체력이 1 깎였습니다!\n"
-                else:
-                    ai_dmg_deal += 3
-                    log_message += f"⚔️ [상대 전투사 궁극기 작렬!] 당신이 3의 대미지를 입었습니다!\n"
-            elif "피닉스" in ai_ult_type:
-                st.session_state.ai_phoenix_turns = 2
-                log_message += f"🦅 [상대 피닉스 부활 발동!] 앞으로 2턴 내 사망 시 풀피로 부활합니다!\n"
+            ai_dmg_deal += 3
+            log_message += f"✨ [상대 필살기 작렬!] 당신이 대미지 3을 입었습니다!\n"
                 
         elif ai_choice == "공격":
             if is_ai_exhausted:
@@ -345,23 +297,9 @@ else:
             st.session_state.player_counter_cooldown -= 1
         if st.session_state.ai_counter_cooldown > 0:
             st.session_state.ai_counter_cooldown -= 1
-        if st.session_state.player_phoenix_turns > 0:
-            st.session_state.player_phoenix_turns -= 1
-        if st.session_state.ai_phoenix_turns > 0:
-            st.session_state.ai_phoenix_turns -= 1
 
-        st.session_state.player_hp = max(0, st.session_state.player_hp - ai_dmg_deal - p_self_damage)
-        st.session_state.ai_hp = max(0, st.session_state.ai_hp - p_dmg_deal - ai_self_damage)
-
-        if st.session_state.player_hp == 0 and st.session_state.player_phoenix_turns > 0:
-            st.session_state.player_hp = st.session_state.max_hp
-            st.session_state.player_phoenix_turns = 0
-            log_message += "\n🦅 **[피닉스 부활 발동!]** 풀피로 부활했습니다!\n"
-            
-        if st.session_state.ai_hp == 0 and st.session_state.ai_phoenix_turns > 0:
-            st.session_state.ai_hp = st.session_state.max_hp
-            st.session_state.ai_phoenix_turns = 0
-            log_message += "\n🦅 **[상대 피닉스 부활 발동!]** 상대가 풀피로 부활했습니다!\n"
+        st.session_state.player_hp = max(0, st.session_state.player_hp - ai_dmg_deal)
+        st.session_state.ai_hp = max(0, st.session_state.ai_hp - p_dmg_deal)
         
         st.session_state.turn += 1
         st.session_state.log = log_message
