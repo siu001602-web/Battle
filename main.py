@@ -2,14 +2,7 @@ import streamlit as st
 import random
 
 # 페이지 설정
-st.set_page_config(page_title="심리전 턴제 토너먼트", page_icon="🏆", layout="centered")
-
-# 무작위 AI 이름 풀
-AI_NAMES = [
-    "초보킬러", "심리전마스터", "방어의신", "존버충", "알고리즘", 
-    "딥러닝", "버그파이터", "무적기계", "복수의화신", "새벽감성", 
-    "랭커", "은둔고수", "AI대장", "트롤러", "각성한배추", "스팀팩"
-]
+st.set_page_config(page_title="심리전 턴제 미니게임", page_icon="🎮", layout="centered")
 
 # 세션 상태 초기화
 if "initialized" not in st.session_state:
@@ -28,27 +21,14 @@ if "initialized" not in st.session_state:
     st.session_state.player_phoenix_turns = 0
     st.session_state.ai_phoenix_turns = 0
     st.session_state.game_over = False
-    st.session_state.tournament_over = False
     st.session_state.winner = None
-    st.session_state.log = "16강 토너먼트가 시작되었습니다! 능력을 선택하고 첫 상대를 맞이하세요."
+    st.session_state.log = "심리전투를 시작합니다! 행동을 선택하세요."
     st.session_state.player_history = []
     st.session_state.player_ult_type = "전투사 (공격력 3 / 실패시 피-1)"
-    
-    # 토너먼트 초기화 (16강 8명 매치 생성 - 플레이어는 첫 번째 참가자)
-    opponents = random.sample(AI_NAMES, 8)
-    st.session_state.round_name = "16강"
-    st.session_state.current_match_index = 0
-    st.session_state.round_16 = [{"player": "나", "ai": opponents[i]} for i in range(8)]
-    st.session_state.round_8 = []
-    st.session_state.round_4 = []
-    st.session_state.round_final = []
-    
-    # 현재 상대 설정
-    st.session_state.current_ai_name = st.session_state.round_16[0]["ai"]
     st.session_state.ai_ult_type = random.choice(["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"])
     st.session_state.initialized = True
 
-def reset_match():
+def reset_game():
     st.session_state.player_hp = 5
     st.session_state.ai_hp = 5
     st.session_state.turn = 1
@@ -65,19 +45,15 @@ def reset_match():
     st.session_state.game_over = False
     st.session_state.winner = None
     st.session_state.player_history = []
+    st.session_state.log = "게임이 초기화되었습니다. 다시 시작하세요!"
     st.session_state.ai_ult_type = random.choice(["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"])
-
-def restart_tournament():
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    st.rerun()
 
 def render_hp(current_hp, max_hp=5):
     red_hearts = "❤️" * current_hp
     black_hearts = "🖤" * (max_hp - current_hp)
     return f"{red_hearts}{black_hearts} ({current_hp}/{max_hp})"
 
-# AI 선택 로직 (매운맛 고정)
+# 스마트 AI 선택 로직 (매운맛)
 def get_ai_choice(player_history, ai_ultimate, ai_counter_cooldown):
     if ai_ultimate >= 3 and random.random() < 0.7:
         return "필살기"
@@ -105,56 +81,22 @@ def get_ai_choice(player_history, ai_ultimate, ai_counter_cooldown):
             weights.append(1)
     return random.choices(choices, weights=weights, k=1)[0]
 
-st.title("🏆 16강 심리전 토너먼트")
-st.write("하드코어 AI들과 겨루어 토너먼트 우승을 차지하세요!")
+st.title("⚔️ 심리전 턴제 배틀")
+st.write("공격, 방어, 치료, 존버, 반격, 궁극기를 활용해 상대와 겨루세요!")
 
-# 토너먼트 대진표 사이드바 또는 상단 표시
-with st.expander("📊 토너먼트 대진표 보기", expanded=False):
-    r16 = st.session_state.get("round_16", [])
-    r8 = st.session_state.get("round_8", [])
-    r4 = st.session_state.get("round_4", [])
-    r_fin = st.session_state.get("round_final", [])
-    
-    col_t1, col_t2, col_t3, col_t4 = st.columns(4)
-    with col_t1:
-        st.markdown("**16강**")
-        for m in r16:
-            st.text(f"{m['player']} vs {m['ai']}")
-    with col_t2:
-        st.markdown("**8강**")
-        if r8:
-            for m in r8:
-                st.text(f"{m['player']} vs {m['ai']}")
-        else:
-            st.text("-")
-    with col_t3:
-        st.markdown("**4강**")
-        if r4:
-            for m in r4:
-                st.text(f"{m['player']} vs {m['ai']}")
-        else:
-            st.text("-")
-    with col_t4:
-        st.markdown("**결승**")
-        if r_fin:
-            st.text(f"{r_fin[0]['player']} vs {r_fin[0]['ai']}")
-        else:
-            st.text("-")
-
-st.divider()
-
+# 설정 영역 (난이도 및 플레이어 궁극기 선택 - 1턴 이후 변경 불가)
 turn = st.session_state.get("turn", 1)
 is_game_started = turn > 1
 
 col_opt1, col_opt2 = st.columns(2)
 with col_opt1:
-    st.info(f"📍 현재 라운드: **{st.session_state.get('round_name', '16강')}** | 상대: **{st.session_state.get('current_ai_name', '상대')}**")
+    difficulty = st.radio("🤖 AI 난이도", ["보통", "매운맛"], horizontal=True, disabled=is_game_started)
 with col_opt2:
     current_ult = st.session_state.get("player_ult_type", "전투사 (공격력 3 / 실패시 피-1)")
     ult_index = 0 if "전투사" in current_ult else 1
     
     player_ult_type = st.selectbox(
-        "✨ 내 궁극기 선택 (시작 후 변경 불가)", 
+        "✨ 내 궁극기 선택", 
         ["전투사 (공격력 3 / 실패시 피-1)", "피닉스 (2턴내 사망시 풀피 부활)"],
         index=ult_index,
         disabled=is_game_started
@@ -163,6 +105,7 @@ with col_opt2:
 
 st.divider()
 
+# 상태 가져오기
 p_wait = st.session_state.get("player_wait_turns", 0)
 ai_wait = st.session_state.get("ai_wait_turns", 0)
 p_hp = st.session_state.get("player_hp", 5)
@@ -173,7 +116,6 @@ p_cd = st.session_state.get("player_counter_cooldown", 0)
 p_phoenix = st.session_state.get("player_phoenix_turns", 0)
 ai_phoenix = st.session_state.get("ai_phoenix_turns", 0)
 ai_ult_type = st.session_state.get("ai_ult_type", "전투사 (공격력 3 / 실패시 피-1)")
-ai_name = st.session_state.get("current_ai_name", "상대")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -187,54 +129,21 @@ with col3:
     ai_buff_text = f" 🔥버프({ai_wait}턴)" if ai_wait > 0 else ""
     ai_ult_text = f" ✨게이지({ai_ult}/3)"
     ai_phoenix_text = f" 🦅피닉스({ai_phoenix}턴)" if ai_phoenix > 0 else ""
-    st.metric(f"상대: {ai_name}", f"{render_hp(ai_hp)}{ai_buff_text}{ai_phoenix_text}\n{ai_ult_text} (상대 궁: {ai_ult_type.split()[0]})")
+    st.metric("상대 체력", f"{render_hp(ai_hp)}{ai_buff_text}{ai_phoenix_text}\n{ai_ult_text} (상대 궁: {ai_ult_type.split()[0]})")
 
 st.divider()
 
-if st.session_state.get("tournament_over", False):
+if st.session_state.get("game_over", False):
     if st.session_state.winner == "player":
-        st.success("🏆 **축하합니다! 16강 토너먼트 최종 우승을 차지했습니다!**")
+        st.success("🎉 승리했습니다! 상대를 제압했어요!")
+    elif st.session_state.winner == "ai":
+        st.error("💀 패배했습니다... 상대에게 졌습니다.")
     else:
-        st.error("💀 토너먼트 탈락... 다음 기회에 도전하세요.")
+        st.info("🤝 무승부입니다!")
     
-    if st.button("토너먼트 처음부터 다시 하기"):
-        restart_tournament()
-        
-elif st.session_state.get("game_over", False):
-    if st.session_state.winner == "player":
-        st.success(f"🎉 {ai_name} 상대로 승리했습니다! 다음 라운드로 진출합니다!")
-        
-        # 다음 라운드 진출 로직 처리
-        r_name = st.session_state.round_name
-        if r_name == "16강":
-            # 8강 진출자 구성 (플레이어 + AI 승자 3명 무작위 시뮬레이션)
-            other_ais = [m['ai'] for m in st.session_state.round_16 if m['ai'] != ai_name]
-            survivors = random.sample(other_ais, 3)
-            st.session_state.round_8 = [{"player": "나", "ai": survivors[0]}, {"ai": survivors[1], "player": survivors[2]}] # 간단 대진
-            st.session_state.round_name = "8강"
-            st.session_state.current_ai_name = survivors[0]
-        elif r_name == "8강":
-            other_ais = [m['ai'] for m in st.session_state.round_8 if m['ai'] != ai_name]
-            survivors = random.sample(other_ais, 1) if other_ais else ["고수AI"]
-            st.session_state.round_4 = [{"player": "나", "ai": survivors[0]}]
-            st.session_state.round_name = "4강"
-            st.session_state.current_ai_name = survivors[0]
-        elif r_name == "4강":
-            st.session_state.round_final = [{"player": "나", "ai": "최종보스"}]
-            st.session_state.round_name = "결승전"
-            st.session_state.current_ai_name = "최종보스"
-        elif r_name == "결승전":
-            st.session_state.tournament_over = True
-            st.rerun()
-            
-        if not st.session_state.tournament_over:
-            if st.button("다음 경기(라운드) 시작하기"):
-                reset_match()
-                st.rerun()
-    else:
-        st.error(f"💀 {ai_name}에게 패배하여 토너먼트에서 탈락했습니다...")
-        if st.button("토너먼트 재도전"):
-            restart_tournament()
+    if st.button("다시 하기"):
+        reset_game()
+        st.rerun()
 else:
     st.subheader("행동을 선택하세요")
     
@@ -277,7 +186,7 @@ else:
         ai_choice = get_ai_choice(st.session_state.player_history, st.session_state.ai_ultimate, st.session_state.ai_counter_cooldown)
         
         base_damage = 2 if st.session_state.turn >= 10 else 1
-        log_message = f"**[결과 ({st.session_state.round_name} vs {ai_name})]** 당신: {player_choice} | 상대: {ai_choice}\n\n"
+        log_message = f"**[결과]** 당신: {player_choice} | 상대: {ai_choice}\n\n"
         
         p_dmg_deal = 0
         ai_dmg_deal = 0
@@ -306,7 +215,7 @@ else:
                     log_message += f"⚔️ [전투사 궁극기 실패!] 상대의 방어/반격에 막혀 체력이 1 깎였습니다!\n"
                 else:
                     p_dmg_deal = 3
-                    log_message += f"⚔️ [전투사 궁극기 작렬!] 상대에게 3의 강력한 대미지를 줬습니다!\n"
+                    log_message += f"⚔️ [전투사 궁극기 작렬!] 상대에게 3의 대미지를 줬습니다!\n"
             elif "피닉스" in st.session_state.player_ult_type:
                 st.session_state.player_phoenix_turns = 2
                 log_message += f"🦅 [피닉스 부활 발동!] 앞으로 2턴 내 사망 시 풀피로 부활합니다!\n"
@@ -348,7 +257,7 @@ else:
             st.session_state.player_wait_turns = 2
             if st.session_state.player_ultimate < 3:
                 st.session_state.player_ultimate += 1
-            log_message += "⏳ 존버(대기) 상태 돌입! (궁극기 게이지 +1)\n"
+            log_message += "⏳ 존버 상태 돌입! (궁극기 게이지 +1)\n"
             
         elif player_choice == "방어":
             if st.session_state.player_ultimate < 3:
@@ -374,7 +283,7 @@ else:
                     log_message += f"⚔️ [상대 전투사 궁극기 실패!] 당신의 방어/반격에 막혀 상대 체력이 1 깎였습니다!\n"
                 else:
                     ai_dmg_deal += 3
-                    log_message += f"⚔️ [상대 전투사 궁극기 작렬!] 당신이 3의 강력한 대미지를 입었습니다!\n"
+                    log_message += f"⚔️ [상대 전투사 궁극기 작렬!] 당신이 3의 대미지를 입었습니다!\n"
             elif "피닉스" in ai_ult_type:
                 st.session_state.ai_phoenix_turns = 2
                 log_message += f"🦅 [상대 피닉스 부활 발동!] 앞으로 2턴 내 사망 시 풀피로 부활합니다!\n"
